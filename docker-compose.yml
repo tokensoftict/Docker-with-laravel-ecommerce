@@ -44,8 +44,8 @@ services:
       - app_network
 
   mysql:
-    #image: mariadb:${MARIADB_VERSION}
-    image: arm64v8/mysql:${MYSQL_VERSION}
+    image: mariadb:${MARIADB_VERSION}
+    #image: arm64v8/mysql:${MYSQL_VERSION}
     restart: always
     container_name: ${COMPOSE_PROJECT_NAME}_mysql
     ports:
@@ -194,20 +194,6 @@ services:
       - app_network
     ports:
       - ${MEILISEARCH_ON_HOST}:7700
-
-  rabbitmq:
-    image: rabbitmq:management
-    restart: always
-    container_name: ${COMPOSE_PROJECT_NAME}_rabbitmq
-    environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
-      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_VHOST}
-    ports:
-      - ${RABBITMQ_AMQP_PORT}:5672  # AMQP protocol
-      - ${RABBITMQ_MANAGEMENT_PORT}:15672  # Management UI
-    networks:
-      - app_network
 
   zookeeper:
     image: bitnami/zookeeper:latest
