@@ -44,10 +44,12 @@ RUN apk add --no-cache librdkafka-dev \
     && pecl install rdkafka \
     && docker-php-ext-enable rdkafka
 
-RUN apt-get update && apt-get install -y \
-    libmagickwand-dev --no-install-recommends \
-    && pecl install imagick \
-	&& docker-php-ext-enable imagick
+RUN apt-get update && \
+    apt-get install -y libmagickwand-dev --no-install-recommends && \
+    pecl install imagick && \
+    docker-php-ext-enable imagick && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 RUN if [ "${PHP_VERSION}" = "7.4" ]; then \
         docker-php-ext-enable xmlrpc; \
