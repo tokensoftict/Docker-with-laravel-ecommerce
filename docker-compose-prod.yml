@@ -17,10 +17,9 @@ services:
       - php
       - mysql
       - redis
-      - kafka
-      - zookeeper
       - meilisearch
       - phpmyadmin
+      - kafka
     ports:
       - ${HTTP_ON_HOST}:80
       - ${HTTPS_ON_HOST}:443
@@ -40,12 +39,14 @@ services:
     container_name: ${COMPOSE_PROJECT_NAME}_php_${PHP_VERSION}
     volumes:
       - ${PATH_TO_CODE}:/var/www/html
+      - ./supervisor/:/var/log/nats/
     networks:
       - app_network
 
   mysql:
     #image: mariadb:${MARIADB_VERSION}
     image: arm64v8/mysql:${MYSQL_VERSION}
+    restart: always
     container_name: ${COMPOSE_PROJECT_NAME}_mysql
     ports:
       - ${MYSQL_ON_HOST}:3306
@@ -119,6 +120,7 @@ services:
 
   redis:
     image: redis:${REDIS_VERSION}
+    restart: always
     container_name: ${COMPOSE_PROJECT_NAME}_redis
     ports:
       - ${REDIS_ON_HOST}:6379
@@ -166,6 +168,8 @@ services:
       - .env
     environment:
       PMA_HOST: ${PMA_HOST} # Change this to your MySQL container name
+      UPLOAD_LIMIT: ${PHP_MY_ADMIN_UPLOAD_LIMIT}
+
     networks:
       - app_network
 
@@ -175,13 +179,13 @@ services:
     # Uncomment and adjust platform if needed
     # platform: linux/amd64
     image: getmeili/meilisearch:latest
+    restart: always
     container_name: ${COMPOSE_PROJECT_NAME}_meilisearch
     environment:
       - MEILI_MASTER_KEY=${MEILI_MASTER_KEY}
       - MEILI_NO_ANALYTICS=${MEILI_NO_ANALYTICS}
       - MEILI_ENV=${MEILI_ENV}
       - MEILI_LOG_LEVEL=${MEILI_LOG_LEVEL}
-    restart: unless-stopped
     env_file:
       - .env
     volumes:
@@ -191,42 +195,48 @@ services:
     ports:
       - ${MEILISEARCH_ON_HOST}:7700
 
+  rabbitmq:
+    image: rabbitmq:management
+    restart: always
+    container_name: ${COMPOSE_PROJECT_NAME}_rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_VHOST}
+    ports:
+      - ${RABBITMQ_AMQP_PORT}:5672  # AMQP protocol
+      - ${RABBITMQ_MANAGEMENT_PORT}:15672  # Management UI
+    networks:
+      - app_network
+
   zookeeper:
-    #user: 1000:1000
-    #platform: linux/amd64
-    image: confluentinc/cp-zookeeper:latest
-    env_file:
-      - .env
+    image: bitnami/zookeeper:latest
+    restart: always
     container_name: ${COMPOSE_PROJECT_NAME}_zookeeper
     environment:
-      ZOOKEEPER_CLIENT_PORT: ${ZOOKEEPER_CLIENT_PORT}
-      ZOOKEEPER_TICK_TIME: ${ZOOKEEPER_TICK_TIME}
-    ports:
-      - ${ZOOKEEPER_TICK_TIME}:2181
+      - ALLOW_ANONYMOUS_LOGIN=yes
     networks:
       - app_network
-
 
   kafka:
-    #user: 1000:1000
-    #platform: linux/amd64
-    image: confluentinc/cp-kafka:latest
-    env_file:
-      - .env
+    image: bitnami/kafka:latest
+    restart: always
     container_name: ${COMPOSE_PROJECT_NAME}_kafka
-    networks:
-      - app_network
     depends_on:
       - zookeeper
     ports:
-      - ${KAFKA_ADVERTISED_LISTENERS_PORT}:9092
-      - ${KAFKA_ADVERTISED_LISTENERS_PORT_TWO}:29092
+      - "9092:9092"  # Local client connections
+      - "9093:9093"  # Controller communication
+      - "9094:9094"  # External remote access
     environment:
-      KAFKA_BROKER_ID: ${KAFKA_BROKER_ID}
-      KAFKA_ZOOKEEPER_CONNECT: ${KAFKA_ZOOKEEPER_CONNECT}
-      KAFKA_ADVERTISED_LISTENERS: ${KAFKA_ADVERTISED_LISTENERS}
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: ${KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR}
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: ${KAFKA_LISTENER_SECURITY_PROTOCOL_MAP}
-      KAFKA_INTER_BROKER_LISTENER_NAME: ${KAFKA_INTER_BROKER_LISTENER_NAME}
-    volumes:
-      - ./broker/data:/var/lib/kafka/data
+      KAFKA_CFG_NODE_ID: 1
+      KAFKA_CFG_PROCESS_ROLES: "controller,broker"
+      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: "1@${COMPOSE_PROJECT_NAME}_kafka:9093"
+      KAFKA_CFG_LISTENERS: "PLAINTEXT://:9092,PLAINTEXT_EXTERNAL://:9094,CONTROLLER://:9093"
+      KAFKA_CFG_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:9092,PLAINTEXT_EXTERNAL://144.126.141.213:9094"
+      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_EXTERNAL:PLAINTEXT"
+      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_CFG_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
+      KAFKA_CFG_ZOOKEEPER_CONNECT: "${COMPOSE_PROJECT_NAME}_zookeeper:2181"
+    networks:
+      - app_network
