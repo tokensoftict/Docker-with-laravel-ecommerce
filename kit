@@ -141,7 +141,7 @@ function start_application {
 
       if [ ! -d "${PATH_TO_CODE}/vendor" ]; then
           echo -e "Running composer install (missing directory: ${YELLOW}${PATH_TO_CODE}/vendor)${RESET}"
-          docker compose -f ${COMPOSE_FILE} --env-file ${ENV_FILE} run --rm composer install
+          docker compose -f ${COMPOSE_FILE} --env-file ${ENV_FILE} run --rm composer install --ignore-platform-req=ext-exif
           docker compose -f ${COMPOSE_FILE} --env-file ${ENV_FILE} run --rm artisan key:generate
           docker compose -f ${COMPOSE_FILE} --env-file ${ENV_FILE} run --rm artisan migrate --force
       fi

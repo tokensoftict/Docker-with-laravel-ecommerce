@@ -37,18 +37,37 @@ RUN docker-php-ext-install \
     pdo pdo_mysql bcmath bz2 dba gd gmp imap intl ldap \
 	opcache pcntl pspell snmp soap tidy xsl zip
 
+RUN docker-php-ext-install exif \
+    && docker-php-ext-enable exif
 
-RUN if [ ${PHP_VERSION} = "7.4"]; then \
-    	docker-php-ext-enable xmlrpc; \
-        apk imagemagick; \
-    	pecl install -o -f imagick; \
-    	docker-php-ext-enable imagic; \
-    elif [ ${PHP_VERSION} = "8.0" ]; then \
-    	apk xmlrpc-1.0.0RC3; \
-    	docker-php-ext-enable xmlrpc; \
-        apk imagemagick; \
-    	pecl install -o -f imagick; \
-    	docker-php-ext-enable imagic; \
+RUN apk add --no-cache librdkafka-dev \
+    && pecl install rdkafka \
+    && docker-php-ext-enable rdkafka
+
+RUN apt-get update && apt-get install -y \
+    libmagickwand-dev --no-install-recommends \
+    && pecl install imagick \
+	&& docker-php-ext-enable imagick
+
+RUN if [ "${PHP_VERSION}" = "7.4" ]; then \
+        docker-php-ext-enable xmlrpc; \
+        apk add --no-cache imagemagick; \
+        pecl install -o -f imagick; \
+        docker-php-ext-enable imagick; \
+    elif [ "${PHP_VERSION}" = "8.0" ]; then \
+        apk add --no-cache imagemagick; \
+        pecl install -o -f imagick; \
+        docker-php-ext-enable imagick; \
+    elif [ "${PHP_VERSION}" = "8.1" ] || \
+         [ "${PHP_VERSION}" = "8.2" ] || \
+         [ "${PHP_VERSION}" = "8.3" ] || \
+         [ "${PHP_VERSION}" = "8.4" ]; then \
+        apk add --no-cache imagemagick; \
+        pecl install -o -f imagick; \
+        docker-php-ext-enable imagick; \
+    else \
+        echo "Unsupported PHP version: ${PHP_VERSION}"; \
+        exit 1; \
     fi
 
 # packages not working - cgi cli common dev interbase phpdbg sybase imagick memcached enchant
